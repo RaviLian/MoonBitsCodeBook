@@ -29,6 +29,7 @@ def translateDNA(pop):
 def select(pop, fitness):  # nature selection wrt pop's fitness
     # 第一个参数np.arange(POP_SIZE)，是数组0-99，表示被抽样的数组
     # p是概率数组，这里是100个数
+    # 从100个数中按照概率重复抽样 100个
     idx = np.random.choice(np.arange(POP_SIZE), size=POP_SIZE, replace=True,
                            p=fitness / fitness.sum())
     # print("idx:", idx)
