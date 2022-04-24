@@ -116,9 +116,33 @@ class DNA:
 def compute_fitness(dna):
     """
     计算一条DNA解的适应度值
+    顾客总等待时间 + max(科室结束服务时间) + 超阈值等待时间
     """
-    pass
+    patient_status = dna.patient_records.store
+    service_status = dna.service_records.store
+    max_F = get_max_makespan(service_status)
+    T_W = 15
+    gamma = 10
+    W_sum = 0
+    w_thanT_sum = 0
+    for records in patient_status:
+        for i in range(1, len(records)):
+            wait_time = records[i][1] - records[i-1][2]
+            W_sum += wait_time
+            if wait_time - T_W > 0:
+                w_thanT_sum += wait_time - T_W
+    fitn = max_F + W_sum + w_thanT_sum * gamma
+    return fitn
 
+
+
+def get_max_makespan(service_status):
+    F = []
+    for i in range(1, len(service_status)):
+        recs = service_status[i]
+        recs.sort(key=lambda a: a[2])
+        F.append(recs[-1][2])
+    return max(F)
 
 class SGA:
     def __init__(self, people_num, service_times, cross_rate, mutation_rate, pop_size):
@@ -140,6 +164,7 @@ class SGA:
         """解码,之后可以获得种群的fitness之和"""
         for dna in self.pop:
             self.translate_dna(dna)
+        print(self.get_fitness())
 
     def translate_dna(self, dna):
         """单条dna解码，保存状态并计算适应度"""
@@ -208,7 +233,10 @@ class SGA:
 
     def get_fitness(self):
         """获取整个种群的fitness"""
-        pass
+        all_fit = 0
+        for dna in self.pop:
+            all_fit += dna.fitness
+        return all_fit
 
     def get2index(self, item):
         """得到编码解码后客户下标和服务台下标"""
