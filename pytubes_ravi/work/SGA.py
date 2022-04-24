@@ -6,6 +6,7 @@ import numpy as np
 
 
 class PatientRecords:
+    """客户必须+1，因为0不是合法下标"""
     def __init__(self, total_num):
         self.total = total_num
         self.store = self.__init_store()
@@ -16,16 +17,29 @@ class PatientRecords:
         return store
 
     def add_record(self, pidx, record):
+        self.check_self(pidx, record)
         self.store[pidx].append(record)
+
+    def check_self(self, pidx, record):
+        st = record[1]
+        records = self.store[pidx]
+        for record in records:
+            if record[1] == st:
+                print("p-insert-record:", record)
+                print("p-records:", records)
+                raise ValueError("同一时间在两个科室接受服务")
 
     def get_last_project_end(self, pidx):
         """得到上一项目的结束时间"""
         records = self.store[pidx]
+        if len(records) == 0:
+            return 0
         records.sort(key=lambda e: e[2])
         return records[-1][2]
 
 
 class ServiceRecords:
+    """服务台数目+1，因为0号不是合法服务台"""
     def __init__(self, total_num, serve_times):
         """
         :param total_num: 科室数目
@@ -37,7 +51,7 @@ class ServiceRecords:
 
     def __init_store(self):
         # 舍弃0位置,不保存
-        store = [[] for _ in range(self.total + 1)]
+        store = [[] for _ in range(self.total)]
         return store
 
     def add_record(self, service_idx, record):
@@ -45,14 +59,25 @@ class ServiceRecords:
         :param service_idx: 服务台编号
         :param record: [客户index, 开始检查时间, 结束检查时间]
         """
+        self.check_self(service_idx, record)
         self.store[service_idx].append(record)
+
+    def check_self(self, service_idx, record):
+        st = record[1]
+        records = self.store[service_idx]
+        for record in records:
+            if st == record[1]:
+                print("s-insert-record:", record)
+                print("s-records:", records)
+                raise ValueError("同一时刻服务一个客户")
 
     def get_idle_times(self, service_idx):
         """得到该服务台的空闲时间区间"""
         service = self.store[service_idx]
         idles = []
         if len(service) == 0:
-            return idles.append([0, 240])
+            idles.append([0, 240])
+            return idles
         service.sort(key=lambda e: e[1])  # 按照开始检查时间排序
         # 检查0时刻和第一个病人到达时是否有空闲——一般没有
         if service[0][1] - 0 > 0:
@@ -63,33 +88,34 @@ class ServiceRecords:
             first_time = service[i - 1][2]
             if second_time - first_time > 0:
                 idles.append([first_time, second_time])
-        # 末尾的空闲区间
-        if service[-1][2] < 240:
-            idles.append([service[-1][2], 240])
-        else:  # 假如超时了，设置标记位-1，代表无限长
-            idles.append([service[-1][2], -1])
 
         return idles
 
 
 class DNA:
     def __init__(self, people_num, service_times):
-        self.bound = people_num * len(service_times)
+        self.bound = people_num * (len(service_times) - 1)
         self.patient_records = PatientRecords(people_num)
         self.service_records = ServiceRecords(len(service_times), service_times)
         self.fitness = 0  # 适应度值
-        self.result = self.__init_dna()
+        self.genes = self.__init_dna()
 
     def __init_dna(self):
         return np.random.choice([i for i in range(1, self.bound + 1)], size=self.bound, replace=False)
 
+    def __getitem__(self, item):
+        """返回dna保存的值"""
+        return self.genes[item]
+
     def __repr__(self):
-        return self.result.__str__()
+        return self.genes.__str__()
 
 
-def get_fitness(patient_records, service_records):
+
+
+def compute_fitness(dna):
     """
-    计算当前解的适应度值
+    计算一条DNA解的适应度值
     """
     pass
 
@@ -98,7 +124,7 @@ class SGA:
     def __init__(self, people_num, service_times, cross_rate, mutation_rate, pop_size):
         self.people_num = people_num
         self.service_times = service_times
-        self.project_num = len(service_times)
+        self.project_num = len(service_times) - 1
         self.pc = cross_rate
         self.pm = mutation_rate
         self.pop_size = pop_size
@@ -111,12 +137,77 @@ class SGA:
         return pop
 
     def translate(self):
-        """解码"""
+        """解码,之后可以获得种群的fitness之和"""
         for dna in self.pop:
-            pass
+            self.translate_dna(dna)
 
     def translate_dna(self, dna):
         """单条dna解码，保存状态并计算适应度"""
+        # 创建记录
+        for gene in dna:
+            self.create_records(gene, dna)
+        # 计算指标
+        dna.fitness = compute_fitness(dna)
+
+    def check_record(self, records, record):
+        """检查相同记录"""
+        for rec in records:
+            if rec[1] == record[1]:
+                return True
+
+    def filter_checked(self, records, times):
+        """过滤可能造成相同记录的时间段"""
+        if len(times) == 0:
+            return []
+        filtered_times = [ti for ti in times if self.check_record(records, ti) is False]
+        return filtered_times
+
+    def create_records(self, gene, dna):
+        """解码后为客户和服务台分别创建一条记录"""
+        pidx, sidx = self.get2index(gene)
+        consume_time = self.service_times[sidx]
+
+        # 插入记录
+        p_status = dna.patient_records  # 当前dna的客户表格
+        ser_status = dna.service_records  # 当前dna的服务台表格
+
+        last_end_time = p_status.get_last_project_end(pidx) # 上一项目结束时间
+        idles = ser_status.get_idle_times(sidx)  # 当前服务台sidx的空闲区间
+        if len(idles) == 1 and idles[0][0] == 0 and idles[0][1] == 240:  # 科室没有人被分配
+            cur_start_time = max(last_end_time, 0)
+            cur_end_time = cur_start_time + consume_time # 得到结束时间
+            p_status.add_record(pidx, [sidx, cur_start_time, cur_end_time])
+            try:
+                ser_status.add_record(sidx, [pidx, cur_start_time, cur_end_time])
+            except ValueError:
+                print("第一条数据有错!")
+
+        else:
+            # 空闲时间符合插入记录的
+
+            enough = [time for time in idles if time[1] - time[0] > consume_time]
+            enough = self.filter_checked(ser_status.store[sidx], enough)
+            # 根据起始时间排序
+            enough.sort(key=lambda e: e[0])
+            if len(enough) > 0:  # 有足够时间
+                idle = enough[0]
+                cur_start_time = max(last_end_time, idle[0])
+                cur_end_time = cur_start_time + consume_time
+                p_status.add_record(pidx, [sidx, cur_start_time, cur_end_time])
+                ser_status.add_record(sidx, [pidx, cur_start_time, cur_end_time])
+
+
+
+            else:  # 没有足够时间, 设置有超时的
+                records = ser_status.store[sidx]
+                records.sort(key=lambda a:a[2])
+                cur_start_time = max(last_end_time, records[-1][2])
+                cur_end_time = cur_start_time + consume_time
+                p_status.add_record(pidx, [sidx, cur_start_time, cur_end_time])
+                ser_status.add_record(sidx, [pidx, cur_start_time, cur_end_time])
+
+    def get_fitness(self):
+        """获取整个种群的fitness"""
         pass
 
     def get2index(self, item):
@@ -180,6 +271,7 @@ if __name__ == '__main__':
     CROSS_RATE = 0.8  # 交叉概率
     MUTATE_RATE = 1.0  # 变异概率
     FIXED_SERVICE_TIMES = [
+        -1, # 0无
         3,  # 1体质测试
         3,  # 2内科
         4,  # 3外科
@@ -200,3 +292,7 @@ if __name__ == '__main__':
     }
 
     sga = SGA(**params)
+    sga.translate()
+
+
+
