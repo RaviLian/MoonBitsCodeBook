@@ -3,7 +3,7 @@
 染色体chromosome:
 """
 import numpy as np
-
+from copy import deepcopy
 
 class PatientRecords:
     """客户必须+1，因为0不是合法下标"""
@@ -164,7 +164,6 @@ class SGA:
         """解码,之后可以获得种群的fitness之和"""
         for dna in self.pop:
             self.translate_dna(dna)
-        print(self.get_fitness())
 
     def translate_dna(self, dna):
         """单条dna解码，保存状态并计算适应度"""
@@ -234,9 +233,11 @@ class SGA:
     def get_fitness(self):
         """获取整个种群的fitness"""
         all_fit = 0
+        fits = []
         for dna in self.pop:
+            fits.append(dna.fitness)
             all_fit += dna.fitness
-        return all_fit
+        return all_fit, np.array(fits)
 
     def get2index(self, item):
         """得到编码解码后客户下标和服务台下标"""
@@ -252,11 +253,82 @@ class SGA:
 
     def select(self):
         """轮盘赌算法选择交叉Dna"""
-        pass
+        fit_sum, fits = self.get_fitness()
+        idxs = np.random.choice(np.arange(0, self.pop_size), size=self.pop_size, replace=True, p = fits / fit_sum)
 
-    def crossover(self):
+
+        pop_copy = deepcopy(self.pop)
+        select_pop = []
+        best_dna = deepcopy(self.pop[np.argmin(fits)])
+        for i in idxs:
+            select_pop.append(pop_copy[i])
+        return select_pop, best_dna
+
+    def crossover(self, P1, P2):
+        """TODO: 待修改"""
         """交叉"""
-        pass
+        def get_project_bound(p, m):
+            """
+            :param p 客户编号 [1, n]
+            :param m 检查项目的数目
+            """
+            start = (p - 1) * m + 1
+            end = p * m
+            return [i for i in range(start, end + 1)]
+
+        def gen_patient_proj_idx_seq(chromosome, bound):
+            """
+            :param chromosome: 染色体
+            :param bound: 顾客项目编码范围
+            :return: 两个list，一个是顾客项目编码在染色体中的index，一个是顾客项目编码值
+            """
+            idx = [i for i in range(len(chromosome)) if chromosome[i] in bound]
+            seq = [val for val in chromosome if val in bound]
+            return idx, seq
+
+        def change_patient(chromosome, own_change_index, other_proj):
+            """
+            换某一顾客的全部项目
+            :param chromosome: 染色体备份-浅拷贝就够用
+            :param own_change_index: 自己要更换顾客项目的各个位置index
+            :param other_proj: deque结构，要更换的项目，要求保持之前的顺序
+            :return: 新的染色体
+            """
+            for i in range(len(chromosome)):
+                if i in own_change_index:
+                    chromosome[i] = other_proj.pop(0)  # 从左边出队
+            return chromosome
+
+
+        if np.random.rand() < self.pc:
+            cross_idx = np.random.randint(1, self.people_num + 1)  # 随机获取一个顾客的编号
+            project_num = self.project_num
+            change_bound = get_project_bound(cross_idx, project_num)  # 解码顾客项目编号范围
+            # 获取两条染色体上的顾客项目idx和seq
+            idx1, seq1 = gen_patient_proj_idx_seq(P1.genes, change_bound)
+            idx2, seq2 = gen_patient_proj_idx_seq(P2.genes, change_bound)
+            # 根据一定概率pc交叉产生子代C1， C2
+            C1 = change_patient(P1.genes.copy(), idx1, seq2)
+            self.mutation(C1)
+            C2 = change_patient(P2.genes.copy(), idx2, seq1)
+            self.mutation(C2)
+            C1_ = DNA(self.people_num, self.service_times)
+            C1_.genes = np.array(C1)
+            C2_ = DNA(self.people_num, self.service_times)
+            C2_.genes = np.array(C2)
+
+            self.translate_dna(P1)
+            self.translate_dna(C1_)
+            self.translate_dna(C2_)
+            fits = [P1.fitness, C1_.fitness, C2_.fitness]
+            idx = np.argmax(fits)
+            if idx == 0:
+                return P1
+            elif idx == 1:
+                return C1_
+            else:
+                return C2_
+
 
     @staticmethod
     def mutation(chromosome):
@@ -268,29 +340,31 @@ class SGA:
         idx1, idx2 = np.random.choice([i for i in range(0, bound)], size=2, replace=False)
         chromosome[idx1], chromosome[idx2] = chromosome[idx2], chromosome[idx1]
 
-    def evolve(self, fitness):
+    def evolve(self):
         """将交叉变异后的优良染色体引入种群"""
-        # pop = self.select(fitness)
-        # pop_copy = pop.copy()
-        # for parent in pop:  # for every parent
-        #     child = self.crossover(parent, pop_copy)
-        #     child = self.mutate(child)
-        #     parent[:] = child
-        # self.pop = pop
-        pass
+        select_pop, best_dna = self.select()
+        new_pop = []
+        for parent in select_pop:  # for every parent
+            child = self.crossover(parent, best_dna)
+            parent = child
+            new_pop.append(parent)
+        self.pop = new_pop
 
 
 def run(algo, iter_num):
-    for generation in iter_num:
+    best_fits = []
+    for generation in range(iter_num):
         # 解码种群
-        # p_status, service_status = algo.translate(algo.pop)
+        algo.translate()
         # 计算适应度值
-        # fit = get_fitness(p_status, service_status)
+        _, fits = algo.get_fitness()
         # 优良染色体假如种群
-        # algo.evolve(fit)
+        algo.evolve()
         # 拿到适应度值最好的dna
+        best_idx = np.argmax(fits)
         # 输入或者记录到list——fitness
-        pass
+        print('Gen:', generation, '| best fit: %.2f' % fits[best_idx], )
+        best_fits.append(fits[best_idx])
 
 
 if __name__ == '__main__':
@@ -320,7 +394,7 @@ if __name__ == '__main__':
     }
 
     sga = SGA(**params)
-    sga.translate()
+    run(sga, N_GENERATIONS)
 
 
 
