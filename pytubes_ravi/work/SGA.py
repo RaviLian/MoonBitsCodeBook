@@ -94,6 +94,8 @@ class ServiceRecords:
 
 class DNA:
     def __init__(self, people_num, service_times):
+        self.people_num = people_num
+        self.service_times = service_times
         self.bound = people_num * (len(service_times) - 1)
         self.patient_records = PatientRecords(people_num)
         self.service_records = ServiceRecords(len(service_times), service_times)
@@ -110,6 +112,9 @@ class DNA:
     def __repr__(self):
         return self.genes.__str__()
 
+    def clear_records(self):
+        self.patient_records = PatientRecords(self.people_num)
+        self.service_records = ServiceRecords(len(self.service_times), self.service_times)
 
 
 
@@ -317,7 +322,9 @@ class SGA:
             self.mutation(C2)
 
 
-            self.translate_dna(P1)
+            # self.translate_dna(P1)
+            C1.clear_records()
+            C2.clear_records()
             self.translate_dna(C1)
             self.translate_dna(C2)
             fits = [P1.fitness, C1.fitness, C2.fitness]
