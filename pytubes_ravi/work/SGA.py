@@ -292,16 +292,15 @@ class SGA:
     def select(self):
         """轮盘赌算法选择交叉Dna"""
         fit_sum, fits = self.get_fitness()
-        fits.sort()
-        mean_fit = np.mean(fits[:11])
         pop_copy = deepcopy(self.pop)
+        pop_copy.sort(key=lambda a:a.fitness)
+        pop_copy = pop_copy[:16]
         select_pop = []
         i = 0
         while i < self.pop_size:
-            idx = np.random.randint(self.pop_size)
-            if pop_copy[idx].fitness < mean_fit:
-                select_pop.append(pop_copy[idx])
-                i += 1
+            idx = np.random.randint(len(pop_copy))
+            select_pop.append(pop_copy[idx])
+            i += 1
         assert len(select_pop) == self.pop_size
         best_dna = deepcopy(self.pop[np.argmin(fits)])
         return select_pop, best_dna
@@ -391,7 +390,7 @@ if __name__ == '__main__':
         5,  # 7X光
         6,  # 8B超
     ]  # 共28分钟
-    TOTAL_PEOPLE_NUM = 4
+    TOTAL_PEOPLE_NUM = 40
 
     params = {
         'people_num': TOTAL_PEOPLE_NUM,
@@ -404,5 +403,7 @@ if __name__ == '__main__':
     sga = SGA(**params)
     run(sga, N_GENERATIONS)
 
-
-
+"""
+Gen: 422 | best fit: 65355.00
+Gen: 423 | best fit: 65283.00
+"""
