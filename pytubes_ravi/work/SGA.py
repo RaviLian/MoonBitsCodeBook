@@ -144,6 +144,39 @@ def get_max_makespan(service_status):
         F.append(recs[-1][2])
     return max(F)
 
+
+def get_project_bound(p, m):
+    """
+    :param p 客户编号 [1, n]
+    :param m 检查项目的数目
+    """
+    start = (p - 1) * m + 1
+    end = p * m
+    return [i for i in range(start, end + 1)]
+
+def gen_patient_proj_idx_seq(chromosome, bound):
+    """
+    :param chromosome: 染色体
+    :param bound: 顾客项目编码范围
+    :return: 两个list，一个是顾客项目编码在染色体中的index，一个是顾客项目编码值
+    """
+    idx = [i for i in range(len(chromosome.genes)) if chromosome.genes[i] in bound]
+    seq = [val for val in chromosome.genes if val in bound]
+    return idx, seq
+
+def change_patient(chromosome, own_change_index, other_proj):
+    """
+    换某一顾客的全部项目
+    :param chromosome: 染色体备份-浅拷贝就够用
+    :param own_change_index: 自己要更换顾客项目的各个位置index
+    :param other_proj: deque结构，要更换的项目，要求保持之前的顺序
+    :return: 新的染色体
+    """
+    for i in range(len(chromosome.genes)):
+        if i in own_change_index:
+            chromosome.genes[i] = other_proj.pop(0)  # 从左边出队
+    return chromosome
+
 class SGA:
     def __init__(self, people_num, service_times, cross_rate, mutation_rate, pop_size):
         self.people_num = people_num
@@ -254,80 +287,49 @@ class SGA:
     def select(self):
         """轮盘赌算法选择交叉Dna"""
         fit_sum, fits = self.get_fitness()
-        idxs = np.random.choice(np.arange(0, self.pop_size), size=self.pop_size, replace=True, p = fits / fit_sum)
-
-
+        fits.sort()
+        mean_fit = np.mean(fits[:11])
         pop_copy = deepcopy(self.pop)
         select_pop = []
+        i = 0
+        while i < self.pop_size:
+            idx = np.random.randint(self.pop_size)
+            if pop_copy[idx].fitness < mean_fit:
+                select_pop.append(pop_copy[idx])
+                i += 1
+        assert len(select_pop) == self.pop_size
         best_dna = deepcopy(self.pop[np.argmin(fits)])
-        for i in idxs:
-            select_pop.append(pop_copy[i])
         return select_pop, best_dna
 
     def crossover(self, P1, P2):
-        """TODO: 待修改"""
         """交叉"""
-        def get_project_bound(p, m):
-            """
-            :param p 客户编号 [1, n]
-            :param m 检查项目的数目
-            """
-            start = (p - 1) * m + 1
-            end = p * m
-            return [i for i in range(start, end + 1)]
-
-        def gen_patient_proj_idx_seq(chromosome, bound):
-            """
-            :param chromosome: 染色体
-            :param bound: 顾客项目编码范围
-            :return: 两个list，一个是顾客项目编码在染色体中的index，一个是顾客项目编码值
-            """
-            idx = [i for i in range(len(chromosome)) if chromosome[i] in bound]
-            seq = [val for val in chromosome if val in bound]
-            return idx, seq
-
-        def change_patient(chromosome, own_change_index, other_proj):
-            """
-            换某一顾客的全部项目
-            :param chromosome: 染色体备份-浅拷贝就够用
-            :param own_change_index: 自己要更换顾客项目的各个位置index
-            :param other_proj: deque结构，要更换的项目，要求保持之前的顺序
-            :return: 新的染色体
-            """
-            for i in range(len(chromosome)):
-                if i in own_change_index:
-                    chromosome[i] = other_proj.pop(0)  # 从左边出队
-            return chromosome
-
-
         if np.random.rand() < self.pc:
             cross_idx = np.random.randint(1, self.people_num + 1)  # 随机获取一个顾客的编号
             project_num = self.project_num
             change_bound = get_project_bound(cross_idx, project_num)  # 解码顾客项目编号范围
             # 获取两条染色体上的顾客项目idx和seq
-            idx1, seq1 = gen_patient_proj_idx_seq(P1.genes, change_bound)
-            idx2, seq2 = gen_patient_proj_idx_seq(P2.genes, change_bound)
+            idx1, seq1 = gen_patient_proj_idx_seq(P1, change_bound)
+            idx2, seq2 = gen_patient_proj_idx_seq(P2, change_bound)
             # 根据一定概率pc交叉产生子代C1， C2
-            C1 = change_patient(P1.genes.copy(), idx1, seq2)
+            C1 = change_patient(deepcopy(P1), idx1, seq2)
             self.mutation(C1)
-            C2 = change_patient(P2.genes.copy(), idx2, seq1)
+            C2 = change_patient(deepcopy(P2), idx2, seq1)
             self.mutation(C2)
-            C1_ = DNA(self.people_num, self.service_times)
-            C1_.genes = np.array(C1)
-            C2_ = DNA(self.people_num, self.service_times)
-            C2_.genes = np.array(C2)
+
 
             self.translate_dna(P1)
-            self.translate_dna(C1_)
-            self.translate_dna(C2_)
-            fits = [P1.fitness, C1_.fitness, C2_.fitness]
-            idx = np.argmax(fits)
+            self.translate_dna(C1)
+            self.translate_dna(C2)
+            fits = [P1.fitness, C1.fitness, C2.fitness]
+            idx = np.argmin(fits)
             if idx == 0:
                 return P1
             elif idx == 1:
-                return C1_
+                return C1
             else:
-                return C2_
+                return C2
+        else:
+            return P1
 
 
     @staticmethod
@@ -336,9 +338,9 @@ class SGA:
         基因突变，任意两个基因交换顺序
         :param chromosome: 染色体
         """
-        bound = len(chromosome)
+        bound = len(chromosome.genes)
         idx1, idx2 = np.random.choice([i for i in range(0, bound)], size=2, replace=False)
-        chromosome[idx1], chromosome[idx2] = chromosome[idx2], chromosome[idx1]
+        chromosome.genes[idx1], chromosome.genes[idx2] = chromosome[idx2], chromosome[idx1]
 
     def evolve(self):
         """将交叉变异后的优良染色体引入种群"""
@@ -346,8 +348,7 @@ class SGA:
         new_pop = []
         for parent in select_pop:  # for every parent
             child = self.crossover(parent, best_dna)
-            parent = child
-            new_pop.append(parent)
+            new_pop.append(child)
         self.pop = new_pop
 
 
@@ -360,15 +361,15 @@ def run(algo, iter_num):
         _, fits = algo.get_fitness()
         # 优良染色体假如种群
         algo.evolve()
-        # 拿到适应度值最好的dna
-        best_idx = np.argmax(fits)
+        # 拿到适应度值最小的dna
+        best_idx = np.argmin(fits)
         # 输入或者记录到list——fitness
         print('Gen:', generation, '| best fit: %.2f' % fits[best_idx], )
         best_fits.append(fits[best_idx])
 
 
 if __name__ == '__main__':
-    POPULATION_SIZE = 150  # 种群大小, 即解的个数
+    POPULATION_SIZE = 50  # 种群大小, 即解的个数
     N_GENERATIONS = 600  # 迭代次数
     CROSS_RATE = 0.8  # 交叉概率
     MUTATE_RATE = 1.0  # 变异概率
@@ -383,7 +384,7 @@ if __name__ == '__main__':
         5,  # 7X光
         6,  # 8B超
     ]  # 共28分钟
-    TOTAL_PEOPLE_NUM = 40
+    TOTAL_PEOPLE_NUM = 4
 
     params = {
         'people_num': TOTAL_PEOPLE_NUM,
