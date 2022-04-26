@@ -140,8 +140,8 @@ def compute_fitness(dna):
     patient_status = dna.patient_records.store
     service_status = dna.service_records.store
     max_F = get_max_makespan(service_status)
-    T_W = 15
-    gamma = 10
+    T_W = 5
+    gamma = 5
     W_sum = 0
     w_thanT_sum = 0
     for records in patient_status:
@@ -158,8 +158,8 @@ def compute_metric(dna):
     patient_status = dna.patient_records.store
     service_status = dna.service_records.store
     max_F = get_max_makespan(service_status)
-    T_W = 15
-    gamma = 10
+    T_W = 5
+    gamma = 5
     W_sum = 0
     w_thanT_sum = 0
     for records in patient_status:
@@ -323,17 +323,24 @@ class SGA:
         return pidx, sidx
 
     def select(self):
-        """轮盘赌算法选择交叉Dna"""
+        """随机选择交叉Dna"""
         fit_sum, fits = self.get_fitness()
         pop_copy = deepcopy(self.pop)
-        pop_copy.sort(key=lambda a:a.fitness)
-        pop_copy = pop_copy[:16]
+        # pop_copy.sort(key=lambda a:a.fitness)
+        # pop_copy = pop_copy[:16]
+        # select_pop = []
+        # i = 0
+        # while i < self.pop_size:
+        #     idx = np.random.randint(len(pop_copy))
+        #     select_pop.append(pop_copy[idx])
+        #     i += 1
+        # assert len(select_pop) == self.pop_size
+        # best_dna = deepcopy(self.pop[np.argmin(fits)])
+        # return select_pop, best_dna
         select_pop = []
-        i = 0
-        while i < self.pop_size:
+        for i in range(self.pop_size):
             idx = np.random.randint(len(pop_copy))
             select_pop.append(pop_copy[idx])
-            i += 1
         assert len(select_pop) == self.pop_size
         best_dna = deepcopy(self.pop[np.argmin(fits)])
         return select_pop, best_dna
@@ -419,7 +426,7 @@ def run(algo, iter_num):
             temp_gen = gen_str
             metric = compute_metric(temp_dna)
             metric_str = 'fitness: {}, maxF: {}, W_sum: {}, w_thanT_sum: {}'.format(metric[0], metric[1], metric[2],                                                                     metric[3])
-            save_dna(temp_gen, temp_dna, metric_str, './result.txt')
+            save_dna(temp_gen, temp_dna, metric_str, './result2.txt')
 
         # 优良染色体加入种群
         algo.evolve()
@@ -427,12 +434,13 @@ def run(algo, iter_num):
             dna.clear_records()
     # 根据best_fits绘制图
     plt.plot(best_fits)
+    plt.show()
 
 
 
 if __name__ == '__main__':
     POPULATION_SIZE = 50  # 种群大小, 即解的个数
-    N_GENERATIONS = 500  # 迭代次数
+    N_GENERATIONS = 550  # 迭代次数
     CROSS_RATE = 0.8  # 交叉概率
     MUTATE_RATE = 1.0  # 变异概率
     FIXED_SERVICE_TIMES = [
