@@ -37,6 +37,12 @@ class PatientRecords:
         records.sort(key=lambda e: e[2])
         return records[-1][2]
 
+    def not_full(self):
+        for records in self.store:
+            if len(records) == 0:
+                return True
+        return False
+
 
 class ServiceRecords:
     """服务台数目+1，因为0号不是合法服务台"""
@@ -53,6 +59,12 @@ class ServiceRecords:
         # 舍弃0位置,不保存
         store = [[] for _ in range(self.total)]
         return store
+
+    def not_full(self):
+        for records in self.store:
+            if len(records) == 0:
+                return True
+        return False
 
     def add_record(self, service_idx, record):
         """
@@ -205,6 +217,8 @@ class SGA:
 
     def translate_dna(self, dna):
         """单条dna解码，保存状态并计算适应度"""
+        if dna.patient_records.not_full() is False:
+            dna.clear_records()
         # 创建记录
         for gene in dna:
             self.create_records(gene, dna)
