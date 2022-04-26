@@ -76,5 +76,8 @@ def mutation(chromosome):
 
 
 if __name__ == '__main__':
-    crossover()
-
+    # crossover()
+    a = np.array([1, 2, 3, 4])
+    a = list(a)
+    s = a.__str__()
+    print(s)

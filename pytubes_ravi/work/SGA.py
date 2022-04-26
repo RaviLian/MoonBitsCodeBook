@@ -4,6 +4,7 @@
 """
 import numpy as np
 from copy import deepcopy
+import matplotlib.pyplot as plt
 
 class PatientRecords:
     """客户必须+1，因为0不是合法下标"""
@@ -122,7 +123,8 @@ class DNA:
         return self.genes[item]
 
     def __repr__(self):
-        return self.genes.__str__()
+        genes = list(self.genes)
+        return genes.__str__()
 
     def clear_records(self):
         self.patient_records = PatientRecords(self.people_num)
@@ -151,6 +153,23 @@ def compute_fitness(dna):
     fitn = max_F + W_sum + w_thanT_sum * gamma
     return fitn
 
+
+def compute_metric(dna):
+    patient_status = dna.patient_records.store
+    service_status = dna.service_records.store
+    max_F = get_max_makespan(service_status)
+    T_W = 15
+    gamma = 10
+    W_sum = 0
+    w_thanT_sum = 0
+    for records in patient_status:
+        for i in range(1, len(records)):
+            wait_time = records[i][1] - records[i - 1][2]
+            W_sum += wait_time
+            if wait_time - T_W > 0:
+                w_thanT_sum += wait_time - T_W
+    fitn = max_F + W_sum + w_thanT_sum * gamma
+    return fitn, max_F, W_sum, w_thanT_sum
 
 
 def get_max_makespan(service_status):
@@ -218,7 +237,7 @@ class SGA:
     def translate_dna(self, dna):
         """单条dna解码，保存状态并计算适应度"""
         if dna.patient_records.not_full() is False:
-            dna.clear_records()
+            raise ValueError("存在重复记录!")
         # 创建记录
         for gene in dna:
             self.create_records(gene, dna)
@@ -371,26 +390,49 @@ class SGA:
             new_pop.append(child)
         self.pop = new_pop
 
+def save_dna(gen_str, dna, metric_str, path):
+    dna_seq = dna.__repr__()
+    lines = [gen_str, metric_str, dna_seq]
+    with open(path, "a+", encoding='utf-8') as f:
+        f.write('\n'.join(lines))
 
 def run(algo, iter_num):
     best_fits = []
+    temp_dna = DNA(TOTAL_PEOPLE_NUM, FIXED_SERVICE_TIMES)
+    temp_dna.fitness = 1000000
+    temp_fits = 1000000
     for generation in range(iter_num):
         # 解码种群
         algo.translate()
         # 计算适应度值
         _, fits = algo.get_fitness()
-        # 优良染色体假如种群
-        algo.evolve()
         # 拿到适应度值最小的dna
         best_idx = np.argmin(fits)
         # 输入或者记录到list——fitness
-        print('Gen:', generation, '| best fit: %.2f' % fits[best_idx], )
+        gen_str = '\nGen: {} | best fit: {}'.format(generation, fits[best_idx])
+        print(gen_str)
         best_fits.append(fits[best_idx])
+        d = algo.pop[best_idx]
+        if d.fitness < temp_fits:
+            temp_fits = d.fitness
+            temp_dna = d
+            temp_gen = gen_str
+            metric = compute_metric(temp_dna)
+            metric_str = 'fitness: {}, maxF: {}, W_sum: {}, w_thanT_sum: {}'.format(metric[0], metric[1], metric[2],                                                                     metric[3])
+            save_dna(temp_gen, temp_dna, metric_str, './result.txt')
+
+        # 优良染色体加入种群
+        algo.evolve()
+        for dna in algo.pop:
+            dna.clear_records()
+    # 根据best_fits绘制图
+    plt.plot(best_fits)
+
 
 
 if __name__ == '__main__':
     POPULATION_SIZE = 50  # 种群大小, 即解的个数
-    N_GENERATIONS = 600  # 迭代次数
+    N_GENERATIONS = 500  # 迭代次数
     CROSS_RATE = 0.8  # 交叉概率
     MUTATE_RATE = 1.0  # 变异概率
     FIXED_SERVICE_TIMES = [
@@ -416,8 +458,3 @@ if __name__ == '__main__':
 
     sga = SGA(**params)
     run(sga, N_GENERATIONS)
-
-"""
-Gen: 422 | best fit: 65355.00
-Gen: 423 | best fit: 65283.00
-"""
