@@ -2,12 +2,16 @@
 单种群遗传算法
 染色体chromosome:
 """
+import time
+
 import numpy as np
 from copy import deepcopy
 import matplotlib.pyplot as plt
 
+
 class PatientRecords:
     """客户必须+1，因为0不是合法下标"""
+
     def __init__(self, total_num):
         self.total = total_num
         self.store = self.__init_store()
@@ -47,6 +51,7 @@ class PatientRecords:
 
 class ServiceRecords:
     """服务台数目+1，因为0号不是合法服务台"""
+
     def __init__(self, total_num, serve_times):
         """
         :param total_num: 科室数目
@@ -131,7 +136,6 @@ class DNA:
         self.service_records = ServiceRecords(len(self.service_times), self.service_times)
 
 
-
 def compute_fitness(dna):
     """
     计算一条DNA解的适应度值
@@ -146,7 +150,7 @@ def compute_fitness(dna):
     w_thanT_sum = 0
     for records in patient_status:
         for i in range(1, len(records)):
-            wait_time = records[i][1] - records[i-1][2]
+            wait_time = records[i][1] - records[i - 1][2]
             W_sum += wait_time
             if wait_time - T_W > 0:
                 w_thanT_sum += wait_time - T_W
@@ -190,6 +194,7 @@ def get_project_bound(p, m):
     end = p * m
     return [i for i in range(start, end + 1)]
 
+
 def gen_patient_proj_idx_seq(chromosome, bound):
     """
     :param chromosome: 染色体
@@ -199,6 +204,7 @@ def gen_patient_proj_idx_seq(chromosome, bound):
     idx = [i for i in range(len(chromosome.genes)) if chromosome.genes[i] in bound]
     seq = [val for val in chromosome.genes if val in bound]
     return idx, seq
+
 
 def change_patient(chromosome, own_change_index, other_proj):
     """
@@ -212,6 +218,7 @@ def change_patient(chromosome, own_change_index, other_proj):
         if i in own_change_index:
             chromosome.genes[i] = other_proj.pop(0)  # 从左边出队
     return chromosome
+
 
 class SGA:
     def __init__(self, people_num, service_times, cross_rate, mutation_rate, pop_size):
@@ -266,11 +273,11 @@ class SGA:
         p_status = dna.patient_records  # 当前dna的客户表格
         ser_status = dna.service_records  # 当前dna的服务台表格
 
-        last_end_time = p_status.get_last_project_end(pidx) # 上一项目结束时间
+        last_end_time = p_status.get_last_project_end(pidx)  # 上一项目结束时间
         idles = ser_status.get_idle_times(sidx)  # 当前服务台sidx的空闲区间
         if len(idles) == 1 and idles[0][0] == 0 and idles[0][1] == 240:  # 科室没有人被分配
             cur_start_time = max(last_end_time, 0)
-            cur_end_time = cur_start_time + consume_time # 得到结束时间
+            cur_end_time = cur_start_time + consume_time  # 得到结束时间
             p_status.add_record(pidx, [sidx, cur_start_time, cur_end_time])
             try:
                 ser_status.add_record(sidx, [pidx, cur_start_time, cur_end_time])
@@ -295,7 +302,7 @@ class SGA:
 
             else:  # 没有足够时间, 设置有超时的
                 records = ser_status.store[sidx]
-                records.sort(key=lambda a:a[2])
+                records.sort(key=lambda a: a[2])
                 cur_start_time = max(last_end_time, records[-1][2])
                 cur_end_time = cur_start_time + consume_time
                 p_status.add_record(pidx, [sidx, cur_start_time, cur_end_time])
@@ -360,7 +367,6 @@ class SGA:
             C2 = change_patient(deepcopy(P2), idx2, seq1)
             self.mutation(C2)
 
-
             # self.translate_dna(P1)
             C1.clear_records()
             C2.clear_records()
@@ -376,7 +382,6 @@ class SGA:
                 return C2
         else:
             return P1
-
 
     @staticmethod
     def mutation(chromosome):
@@ -397,11 +402,13 @@ class SGA:
             new_pop.append(child)
         self.pop = new_pop
 
+
 def save_dna(gen_str, dna, metric_str, path):
     dna_seq = dna.__repr__()
     lines = [gen_str, metric_str, dna_seq]
     with open(path, "a+", encoding='utf-8') as f:
         f.write('\n'.join(lines))
+
 
 def run(algo, iter_num):
     best_fits = []
@@ -425,26 +432,25 @@ def run(algo, iter_num):
             temp_dna = d
             temp_gen = gen_str
             metric = compute_metric(temp_dna)
-            metric_str = 'fitness: {}, maxF: {}, W_sum: {}, w_thanT_sum: {}'.format(metric[0], metric[1], metric[2],                                                                     metric[3])
+            metric_str = 'fitness: {}, maxF: {}, W_sum: {}, w_thanT_sum: {}'.format(metric[0], metric[1], metric[2],
+                                                                                    metric[3])
             save_dna(temp_gen, temp_dna, metric_str, './result2.txt')
 
         # 优良染色体加入种群
         algo.evolve()
         for dna in algo.pop:
             dna.clear_records()
-    # 根据best_fits绘制图
-    plt.plot(best_fits)
-    plt.show()
+    return best_fits
 
 
 
 if __name__ == '__main__':
-    POPULATION_SIZE = 50  # 种群大小, 即解的个数
+    POPULATION_SIZE = 150  # 种群大小, 即解的个数
     N_GENERATIONS = 550  # 迭代次数
     CROSS_RATE = 0.8  # 交叉概率
     MUTATE_RATE = 1.0  # 变异概率
     FIXED_SERVICE_TIMES = [
-        -1, # 0无
+        -1,  # 0无
         3,  # 1体质测试
         3,  # 2内科
         4,  # 3外科
@@ -456,13 +462,26 @@ if __name__ == '__main__':
     ]  # 共28分钟
     TOTAL_PEOPLE_NUM = 40
 
+    TEST_PEOPLE_NUM = 4
+    TEST_POP_SIZE = 5
+    TEST_SERVER_TIMES = [
+        -1,
+        2,
+        2,
+        6
+    ]
     params = {
-        'people_num': TOTAL_PEOPLE_NUM,
-        'service_times': FIXED_SERVICE_TIMES,
+        'people_num': TEST_PEOPLE_NUM,
+        'service_times': TEST_SERVER_TIMES,
         'cross_rate': CROSS_RATE,
         'mutation_rate': MUTATE_RATE,
-        'pop_size': POPULATION_SIZE,
+        'pop_size': TEST_POP_SIZE,
     }
 
     sga = SGA(**params)
-    run(sga, N_GENERATIONS)
+    start = time.time()
+    data = run(sga, N_GENERATIONS)
+    end = time.time()
+    print("运行时间: {}s".format(end - start))
+    plt.plot(data)
+    plt.show()
