@@ -9,6 +9,8 @@ from copy import deepcopy
 import matplotlib.pyplot as plt
 
 
+TIME_MAX = 1000
+
 class PatientRecords:
     """客户必须+1，因为0不是合法下标"""
 
@@ -94,18 +96,22 @@ class ServiceRecords:
         service = self.store[service_idx]
         idles = []
         if len(service) == 0:
-            idles.append([0, 240])
+            idles.append([0, TIME_MAX])
             return idles
         service.sort(key=lambda e: e[1])  # 按照开始检查时间排序
         # 检查0时刻和第一个病人到达时是否有空闲——一般没有
         if service[0][1] - 0 > 0:
             idles.append([0, service[0][1]])
         # 中间的空闲区间
-        for i in range(1, len(service)):
-            second_time = service[i][1]
-            first_time = service[i - 1][2]
+        for i in range(0, len(service)):
+            if i == len(service) - 1:
+                break
+            second_time = service[i + 1][1]
+            first_time = service[i][2]
             if second_time - first_time > 0:
                 idles.append([first_time, second_time])
+        # 末尾的空闲时间
+        # idles.append([service[-1][2], TIME_MAX])
 
         return idles
 
@@ -149,11 +155,17 @@ def compute_fitness(dna):
     W_sum = 0
     w_thanT_sum = 0
     for records in patient_status:
-        for i in range(1, len(records)):
-            wait_time = records[i][1] - records[i - 1][2]
-            W_sum += wait_time
-            if wait_time - T_W > 0:
-                w_thanT_sum += wait_time - T_W
+        for i in range(0, len(records)):
+            if i == 0:
+                wait_time = records[i][1] - 0
+                W_sum += wait_time
+                if wait_time - T_W > 0:
+                    w_thanT_sum += wait_time - T_W
+            else:
+                wait_time = records[i][1] - records[i - 1][2]
+                W_sum += wait_time
+                if wait_time - T_W > 0:
+                    w_thanT_sum += wait_time - T_W
     fitn = max_F + W_sum + w_thanT_sum * gamma
     return fitn
 
@@ -167,11 +179,17 @@ def compute_metric(dna):
     W_sum = 0
     w_thanT_sum = 0
     for records in patient_status:
-        for i in range(1, len(records)):
-            wait_time = records[i][1] - records[i - 1][2]
-            W_sum += wait_time
-            if wait_time - T_W > 0:
-                w_thanT_sum += wait_time - T_W
+        for i in range(0, len(records)):
+            if i == 0:
+                wait_time = records[i][1] - 0
+                W_sum += wait_time
+                if wait_time - T_W > 0:
+                    w_thanT_sum += wait_time - T_W
+            else:
+                wait_time = records[i][1] - records[i - 1][2]
+                W_sum += wait_time
+                if wait_time - T_W > 0:
+                    w_thanT_sum += wait_time - T_W
     fitn = max_F + W_sum + w_thanT_sum * gamma
     return fitn, max_F, W_sum, w_thanT_sum
 
@@ -275,7 +293,7 @@ class SGA:
 
         last_end_time = p_status.get_last_project_end(pidx)  # 上一项目结束时间
         idles = ser_status.get_idle_times(sidx)  # 当前服务台sidx的空闲区间
-        if len(idles) == 1 and idles[0][0] == 0 and idles[0][1] == 240:  # 科室没有人被分配
+        if len(idles) == 1 and idles[0][0] == 0 and idles[0][1] == TIME_MAX:  # 科室没有人被分配
             cur_start_time = max(last_end_time, 0)
             cur_end_time = cur_start_time + consume_time  # 得到结束时间
             p_status.add_record(pidx, [sidx, cur_start_time, cur_end_time])
@@ -297,8 +315,6 @@ class SGA:
                 cur_end_time = cur_start_time + consume_time
                 p_status.add_record(pidx, [sidx, cur_start_time, cur_end_time])
                 ser_status.add_record(sidx, [pidx, cur_start_time, cur_end_time])
-
-
 
             else:  # 没有足够时间, 设置有超时的
                 records = ser_status.store[sidx]
@@ -460,10 +476,10 @@ if __name__ == '__main__':
         5,  # 7X光
         6,  # 8B超
     ]  # 共28分钟
-    TOTAL_PEOPLE_NUM = 40
+    TOTAL_PEOPLE_NUM = 10
 
-    TEST_PEOPLE_NUM = 4
-    TEST_POP_SIZE = 5
+    TEST_PEOPLE_NUM = 10
+    TEST_POP_SIZE = 1
     TEST_SERVER_TIMES = [
         -1,
         2,
@@ -471,6 +487,14 @@ if __name__ == '__main__':
         6
     ]
     params = {
+        'people_num': TOTAL_PEOPLE_NUM,
+        'service_times': FIXED_SERVICE_TIMES,
+        'cross_rate': CROSS_RATE,
+        'mutation_rate': MUTATE_RATE,
+        'pop_size': POPULATION_SIZE,
+    }
+
+    test_params = {
         'people_num': TEST_PEOPLE_NUM,
         'service_times': TEST_SERVER_TIMES,
         'cross_rate': CROSS_RATE,
