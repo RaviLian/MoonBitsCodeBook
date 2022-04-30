@@ -174,7 +174,7 @@ def compute_metric(dna):
     patient_status = dna.patient_records.store
     service_status = dna.service_records.store
     max_F = get_max_makespan(service_status)
-    T_W = 5
+    T_W = 15
     gamma = 5
     W_sum = 0
     w_thanT_sum = 0

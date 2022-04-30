@@ -3,21 +3,30 @@
 2. 使用交叉算子和突变算子对当前种群中对解进行重组，产生后代，形成新的种群。进行解码和适应度计算
 3. 迭代：重复1-2，直到解一定代数内最优值没有发生明显改进，输出当前最优解
 """
+import math
+import time
+import random
+from operator import attrgetter
+
 import numpy as np
 
 cost_time_lookup = [
-        3,  # 0体质测试
-        3,  # 1内科
-        4,  # 2外科
-        2,  # 3眼耳口鼻科
-        3,  # 4验血
-        2,  # 5心电图
-        5,  # 6X光
-        6,  # 7B超
+    3,  # 0体质测试
+    3,  # 1内科
+    4,  # 2外科
+    2,  # 3眼耳口鼻科
+    3,  # 4验血
+    2,  # 5心电图
+    5,  # 6X光
+    6,  # 7B超
 ]  # 共28分钟
 
 total_people = 10
 project_num = len(cost_time_lookup)
+T_W = 15  # 等待阈值
+GAMMA = 5 # 惩罚系数
+POP_SIZE = 25  # 种群大小
+GROUP = 100  # 选择权重，百分之百
 
 def translate_operation(opt):
     """解码操作"""
@@ -30,7 +39,6 @@ class Chromosome:
         self.sequence = sequence  # list DNA序列
         self.fitness = None
         self.makespan = None
-        self.maxF = None
         self.total_wait = None
         self.greater_than_threshold = None
 
@@ -44,10 +52,10 @@ class Chromosome:
             people_index, project_index = translate_operation(operation)
             cost_time = cost_time_lookup[project_index]
 
-            people = people_records[people_index] # 客户的所有记录
-            project = project_records[project_index] # 项目的所有记录
+            people = people_records[people_index]  # 客户的所有记录
+            project = project_records[project_index]  # 项目的所有记录
             # 创建记录
-            people_last_end_time = self.get_people_last_end(people) # 人有空的最早时间
+            people_last_end_time = self.get_people_last_end(people)  # 人有空的最早时间
             project_last_ends = self.get_project_last_end(project)
 
             # 科室第一条记录
@@ -74,6 +82,34 @@ class Chromosome:
                     project.append([people_index, start_time, end_time])
         return people_records, project_records
 
+    def compute_fitness(self):
+        global GAMMA
+        global T_W
+        people_records, _ = self.translate()
+        W_sum = 0
+        w_thanT_sum = 0
+        tmp_lates = []
+        for records in people_records:
+            records.sort(key=lambda e:e[2])
+            tmp_lates.append(records[-1][2])
+            for i in range(len(records)):
+                if i == 0:
+                    wait_time = records[i][1] - 0
+                    if wait_time == 0:
+                        continue
+                    W_sum += wait_time
+                    if wait_time - T_W > 0:
+                        w_thanT_sum += wait_time - T_W
+                else:
+                    wait_time = records[i][1] - records[i - 1][2]
+                    W_sum += wait_time
+                    if wait_time - T_W > 0:
+                        w_thanT_sum += wait_time - T_W
+        maxF = max(tmp_lates)
+        self.makespan = maxF
+        self.total_wait = W_sum
+        self.greater_than_threshold = w_thanT_sum
+        self.fitness = maxF + W_sum + GAMMA * w_thanT_sum
 
 
     @staticmethod
@@ -107,17 +143,40 @@ class Chromosome:
         return -1
 
 
+class Population:
+    def __init__(self, size):
+        self.size = size
+        self.members = []
+        self.__seed_population()
+
+    def __seed_population(self):
+        global total_people
+        global project_num
+        sequence_size = total_people * project_num
+        for i in range(self.size):
+            sequence = random.sample(range(1, sequence_size + 1), sequence_size)
+            self.members.append(Chromosome(sequence))
+
+    def evolve_population(self):
+        (parent1, parent2) = self._select()
 
 
+    def _select(self):
+        self._get_fitness()  # 选择前计算适应度
+        num_to_select = math.floor(self.size * (GROUP/100))
+        sample = random.sample(range(self.size), num_to_select)
+        sample_members = sorted([self.members[i] for i in sample], key=attrgetter('fitness'))
+        return sample_members[:2]
+
+    def _crossover(self, parent1, parent2):
+        """得到两个child_seq"""
+        pass
+
+    def _get_fitness(self):
+        for mem in self.members:
+            mem.compute_fitness()
 
 if __name__ == '__main__':
-    seq = [27, 59, 20, 21, 22, 49, 66, 40, 38, 8, 65, 36, 15, 14, 46, 28, 52, 56, 17, 53, 35, 41, 75, 80, 34, 47, 71, 23, 11, 61, 42, 77, 37, 70, 3, 24, 13, 26, 30, 29, 74, 6, 10, 18, 2, 19, 50, 39, 9, 43, 48, 76, 33, 51, 72, 62, 58, 12, 73, 4, 67, 7, 5, 32, 16, 31, 45, 79, 60, 64, 54, 68, 1, 63, 57, 69, 78, 25, 55, 44]
-    c = Chromosome(seq)
-    pi, se = c.translate()
-    for p in pi:
-        print(p)
-    print("----")
-    for s in se:
-        print(s)
-
+    population = Population(POP_SIZE)
+    print(population.evolve_population())
 
