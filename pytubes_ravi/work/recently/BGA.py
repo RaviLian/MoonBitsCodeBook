@@ -30,11 +30,11 @@ total_people = 40
 project_num = len(cost_time_lookup)
 T_W = 15  # 等待阈值
 GAMMA = 5 # 惩罚系数
-POP_SIZE = 25  # 种群大小
+POP_SIZE = 150  # 种群大小
 GROUP = 100  # 选择权重，百分之百
 CROSS_RATE = 0.8
 MUTATE_RATE = 1.0
-N_GENERATIONS = 550
+N_GENERATIONS = 200
 
 def translate_operation(opt):
     """解码操作"""
@@ -168,18 +168,17 @@ class Population:
     def evolve_population(self):
         """种群迭代"""
         global POP_SIZE
-        for _ in range(POP_SIZE):
-            (parent1, parent2) = self.select()
+        for i in range(POP_SIZE - 1):
+            (parent1, parent2) = self.members[i], self.members[i+1]
             child1, child2 = self._crossover(parent1, parent2)
             self._mutate(child1)
             self._mutate(child2)
             parent1.compute_fitness()
             child1.compute_fitness()
             child2.compute_fitness()
-            better = min([child1, child2], key=attrgetter('fitness'))
-            if parent1.fitness >= better.fitness:
-                self.kill_weak()
-                self.members.append(better)
+            better = min([parent1, child1, child2], key=attrgetter('fitness'))
+            idx = self.members.index(parent1)
+            self.members[idx] = better
 
 
     def kill_weak(self):
