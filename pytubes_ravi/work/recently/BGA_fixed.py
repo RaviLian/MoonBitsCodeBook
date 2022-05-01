@@ -22,9 +22,11 @@ cost_time_lookup = [
     6,  # 7B超
 ]  # 共28分钟
 
+
 # cost_time_lookup = [
 #     3, 3, 4, 6
 # ]
+
 
 total_people = 40
 project_num = len(cost_time_lookup)
@@ -56,8 +58,11 @@ class Chromosome:
         global project_num
         people_records = [[] for _ in range(total_people)]
         project_records = [[] for _ in range(project_num)]
+
         for operation in self.sequence:
+
             people_index, project_index = translate_operation(operation)
+
             cost_time = cost_time_lookup[project_index]
 
             people = people_records[people_index]  # 客户的所有记录
@@ -74,7 +79,6 @@ class Chromosome:
                 project.append([people_index, start_time, end_time])
 
             if type(project_last_ends) == list:
-
                 tmp_start = self.get_middle_start_time(project_last_ends, cost_time, people_last_end_time)
                 if tmp_start == -1:
                     # 科室末尾插入
@@ -99,6 +103,7 @@ class Chromosome:
         tmp_lates = []
         for records in people_records:
             records.sort(key=lambda e:e[2])
+
             tmp_lates.append(records[-1][2])
             for i in range(len(records)):
                 if i == 0:
@@ -114,6 +119,7 @@ class Chromosome:
                     if wait_time - T_W > 0:
                         w_thanT_sum += (wait_time - T_W)
         maxF = max(tmp_lates)
+
         self.makespan = maxF
         self.total_wait = W_sum
         self.greater_than_threshold = w_thanT_sum
@@ -151,11 +157,13 @@ class Chromosome:
         return -1
 
 
+
 class Population:
     def __init__(self, size):
         self.size = size
         self.members = []
         self.__seed_population()
+
 
     def __seed_population(self):
         global total_people
@@ -165,21 +173,27 @@ class Population:
             sequence = random.sample(range(1, sequence_size + 1), sequence_size)
             self.members.append(Chromosome(sequence))
 
+
     def evolve_population(self):
         """种群迭代"""
+
         global POP_SIZE
-        for i in range(POP_SIZE - 1):
-            (parent1, parent2) = self.members[i], self.members[i+1]
+        for _ in range(POP_SIZE):
+
+            (parent1, parent2) = self.select()
+
             child1, child2 = self._crossover(parent1, parent2)
             self._mutate(child1)
             self._mutate(child2)
+
             parent1.compute_fitness()
-            parent2.compute_fitness()
             child1.compute_fitness()
             child2.compute_fitness()
-            better = min([parent1, child1, child2], key=attrgetter('fitness'))
-            idx = self.members.index(parent1)
-            self.members[idx] = better
+
+            better = min([child1, child2], key=attrgetter('fitness'))
+            if parent1.fitness >= better.fitness:
+                self.kill_weak()
+                self.members.append(better)
 
 
     def kill_weak(self):
@@ -192,12 +206,15 @@ class Population:
 
 
     def select(self):
+
         if self.members[-1].fitness is None:
             self._get_fitness()  # 选择前计算适应度
+
         num_to_select = math.floor(self.size * (GROUP/100))
         sample = random.sample(range(self.size), num_to_select)
         sample_members = sorted([self.members[i] for i in sample], key=attrgetter('fitness'))
         return sample_members[:2]
+
 
     def _crossover(self, parent1, parent2):
         """得到两个child_seq, 再构造染色体返回"""
@@ -205,21 +222,34 @@ class Population:
         global total_people
         global project_num
         global CROSS_RATE
+
         if random.random() < CROSS_RATE:
             pidx = random.randint(1, total_people)
+
             p_projects = [(pidx - 1) * project_num + i for i in range(1, project_num + 1)]
+
+
             child1_seq = copy.deepcopy(parent1.sequence)
             child2_seq = copy.deepcopy(parent2.sequence)
+
+            # print("*************")
+            # print(child1_seq)
+            # print(child2_seq)
             # 拿到parent1上该顾客的所有项目及顺序
             p1_idxs, p1_seqs = self.get_proj_idx_seq(parent1.sequence, p_projects)
             # 拿到parent2上该顾客的所有项目及顺序
             p2_idxs, p2_seqs = self.get_proj_idx_seq(parent2.sequence, p_projects)
 
-            random.shuffle(p1_seqs)
             random.shuffle(p2_seqs)
+            random.shuffle(p1_seqs)
 
             self.change_seq(child1_seq, p1_idxs, p2_seqs)
             self.change_seq(child2_seq, p2_idxs, p1_seqs)
+
+            # print(child1_seq)
+            # print(child2_seq)
+
+
             return Chromosome(child1_seq), Chromosome(child2_seq)
         else:
             return parent1, parent2
@@ -234,15 +264,11 @@ class Population:
             chromosome.sequence[idx1], chromosome.sequence[idx2] = chromosome.sequence[idx2], chromosome.sequence[idx1]
 
 
-
-
     @staticmethod
     def change_seq(child, change_idxs, new_seqs):
         for i in range(len(child)):
             if i in change_idxs:
                 child[i] = new_seqs.pop(0)
-
-
 
     @staticmethod
     def get_proj_idx_seq(sequence, targets):
@@ -259,10 +285,12 @@ class Population:
         for mem in self.members:
             mem.compute_fitness()
 
-if __name__ == '__main__':
-    best_fitness = 99999999
-    population = Population(POP_SIZE)
 
+if __name__ == '__main__':
+
+    best_fitness = 99999999
+
+    population = Population(POP_SIZE)
     best_fits = []
     for i in range(N_GENERATIONS):
         population.evolve_population()
@@ -274,6 +302,5 @@ if __name__ == '__main__':
         if best_fitness > best.fitness:
             best_fitness = best.fitness
         best_fits.append(best_fitness)
-
     plt.plot(best_fits)
     plt.show()
