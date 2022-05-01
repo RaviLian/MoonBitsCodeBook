@@ -5,9 +5,10 @@
 """
 import math
 import time
+import matplotlib.pyplot as plt
 import random
 from operator import attrgetter
-
+import copy
 import numpy as np
 
 cost_time_lookup = [
@@ -21,12 +22,19 @@ cost_time_lookup = [
     6,  # 7B超
 ]  # 共28分钟
 
-total_people = 10
+# cost_time_lookup = [
+#     3, 3, 4, 6
+# ]
+
+total_people = 40
 project_num = len(cost_time_lookup)
 T_W = 15  # 等待阈值
 GAMMA = 5 # 惩罚系数
 POP_SIZE = 25  # 种群大小
 GROUP = 100  # 选择权重，百分之百
+CROSS_RATE = 0.8
+MUTATE_RATE = 1.0
+N_GENERATIONS = 550
 
 def translate_operation(opt):
     """解码操作"""
@@ -99,12 +107,12 @@ class Chromosome:
                         continue
                     W_sum += wait_time
                     if wait_time - T_W > 0:
-                        w_thanT_sum += wait_time - T_W
+                        w_thanT_sum += (wait_time - T_W)
                 else:
                     wait_time = records[i][1] - records[i - 1][2]
                     W_sum += wait_time
                     if wait_time - T_W > 0:
-                        w_thanT_sum += wait_time - T_W
+                        w_thanT_sum += (wait_time - T_W)
         maxF = max(tmp_lates)
         self.makespan = maxF
         self.total_wait = W_sum
@@ -158,25 +166,110 @@ class Population:
             self.members.append(Chromosome(sequence))
 
     def evolve_population(self):
-        (parent1, parent2) = self._select()
+        """种群迭代"""
+        global POP_SIZE
+        for _ in range(POP_SIZE):
+            (parent1, parent2) = self.select()
+            child1, child2 = self._crossover(parent1, parent2)
+            self._mutate(child1)
+            self._mutate(child2)
+            parent1.compute_fitness()
+            child1.compute_fitness()
+            child2.compute_fitness()
+            better = min([child1, child2], key=attrgetter('fitness'))
+            if parent1.fitness >= better.fitness:
+                self.kill_weak()
+                self.members.append(better)
 
 
-    def _select(self):
-        self._get_fitness()  # 选择前计算适应度
+    def kill_weak(self):
+        weakest = max(self.members, key=attrgetter('fitness'))
+        self.members.remove(weakest)
+
+    def get_best(self):
+        self._get_fitness()
+        return sorted(self.members, key=attrgetter('fitness'))[:1]
+
+
+    def select(self):
+        if self.members[-1].fitness is None:
+            self._get_fitness()  # 选择前计算适应度
         num_to_select = math.floor(self.size * (GROUP/100))
         sample = random.sample(range(self.size), num_to_select)
         sample_members = sorted([self.members[i] for i in sample], key=attrgetter('fitness'))
         return sample_members[:2]
 
     def _crossover(self, parent1, parent2):
-        """得到两个child_seq"""
-        pass
+        """得到两个child_seq, 再构造染色体返回"""
+        # 选择一个顾客id
+        global total_people
+        global project_num
+        global CROSS_RATE
+        if random.random() < CROSS_RATE:
+            pidx = random.randint(1, total_people)
+            p_projects = [(pidx - 1) * project_num + i for i in range(1, project_num + 1)]
+            child1_seq = copy.deepcopy(parent1.sequence)
+            child2_seq = copy.deepcopy(parent2.sequence)
+            # 拿到parent1上该顾客的所有项目及顺序
+            p1_idxs, p1_seqs = self.get_proj_idx_seq(parent1.sequence, p_projects)
+            # 拿到parent2上该顾客的所有项目及顺序
+            p2_idxs, p2_seqs = self.get_proj_idx_seq(parent2.sequence, p_projects)
+            self.change_seq(child1_seq, p1_idxs, p2_seqs)
+            self.change_seq(child2_seq, p2_idxs, p1_seqs)
+            return Chromosome(child1_seq), Chromosome(child2_seq)
+        else:
+            return parent1, parent2
+
+    @staticmethod
+    def _mutate(chromosome):
+        """变异"""
+        global project_num
+        global MUTATE_RATE
+        if random.random() < MUTATE_RATE:
+            idx1, idx2 = np.random.choice(project_num, size=2, replace=False)
+            chromosome.sequence[idx1], chromosome.sequence[idx2] = chromosome.sequence[idx2], chromosome.sequence[idx1]
+
+
+
+
+    @staticmethod
+    def change_seq(child, change_idxs, new_seqs):
+        for i in range(len(child)):
+            if i in change_idxs:
+                child[i] = new_seqs.pop(0)
+
+
+
+    @staticmethod
+    def get_proj_idx_seq(sequence, targets):
+        idxs = []
+        orders = []
+        for i in range(len(sequence)):
+            if sequence[i] in targets:
+                idxs.append(i)
+                orders.append(sequence[i])
+        return idxs, orders
 
     def _get_fitness(self):
+        """统一计算整个种群的fitness"""
         for mem in self.members:
             mem.compute_fitness()
 
 if __name__ == '__main__':
+    best_fitness = 99999999
     population = Population(POP_SIZE)
-    print(population.evolve_population())
 
+    best_fits = []
+    for i in range(N_GENERATIONS):
+        population.evolve_population()
+        dna = population.get_best()
+        best = dna[0]
+        print("Gen: {}, best dna seq: {}".format(i, best.sequence))
+        print("best fitness: {}".format(best.fitness))
+        print("makespan: {}, total_wait: {}, T_W_wait: {}".format(best.makespan, best.total_wait, best.greater_than_threshold))
+        if best_fitness > best.fitness:
+            best_fitness = best.fitness
+        best_fits.append(best_fitness)
+
+    plt.plot(best_fits)
+    plt.show()
