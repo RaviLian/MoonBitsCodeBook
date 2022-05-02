@@ -15,10 +15,10 @@ cost_time_lookup = [
     3,  # 0体质测试   4
     3,  # 1内科      4
     4,  # 2外科      3
-    # 2,  # 3眼耳口鼻科 5
-    # 3,  # 4验血      4
-    # 2,  # 5心电图    5
-    # 5,  # 6X光      3
+    2,  # 3眼耳口鼻科 5
+    3,  # 4验血      4
+    2,  # 5心电图    5
+    5,  # 6X光      3
     6,  # 7B超      2
 ]  # 共28分钟
 
@@ -26,7 +26,7 @@ cost_time_lookup = [
 #     3, 3, 4, 6
 # ]
 
-total_people = 12
+total_people = 30
 project_num = len(cost_time_lookup)
 T_W = 15  # 等待阈值
 GAMMA = 5 # 惩罚系数
@@ -34,7 +34,7 @@ POP_SIZE = 150  # 种群大小
 GROUP = 30  # 选择权重，百分之百
 CROSS_RATE = 0.8
 MUTATE_RATE = 1.0
-N_GENERATIONS = 200
+N_GENERATIONS = 500
 
 def translate_operation(opt):
     """解码操作"""
@@ -194,6 +194,9 @@ class Population:
         for i in range(self.size):
             sequence = random.sample(range(1, sequence_size + 1), sequence_size)
             self.members.append(Chromosome(sequence))
+        # 局部搜索
+        for mem in self.members:
+            self.local_search(mem)
 
     # def get_init_seq(self):
     #     actions = [[j + i * project_num for i in range(total_people)] for j in range(1, project_num + 1)]
@@ -224,6 +227,9 @@ class Population:
             better = min([parent1, child1, child2], key=attrgetter('fitness'))
             idx = self.members.index(parent1)
             self.members[idx] = better
+        # 局部搜索
+        for mem in self.members:
+            self.local_search(mem)
 
 
     def kill_weak(self):
@@ -278,9 +284,29 @@ class Population:
             chromosome.sequence[idx1], chromosome.sequence[idx2] = chromosome.sequence[idx2], chromosome.sequence[idx1]
 
 
-    def local_search(self):
+    def local_search(self, chromosome):
         """局部搜索"""
-        pass
+        tmp1 = self.generate_new_dna(copy.deepcopy(chromosome.sequence))
+        tmp2 = self.generate_new_dna(copy.deepcopy(chromosome.sequence))
+        tmp3 = self.generate_new_dna(copy.deepcopy(chromosome.sequence))
+        tmp4 = self.generate_new_dna(copy.deepcopy(chromosome.sequence))
+        tmp1.compute_fitness()
+        tmp2.compute_fitness()
+        tmp3.compute_fitness()
+        tmp4.compute_fitness()
+        chromosome.compute_fitness()
+        better = min([tmp1, tmp2, tmp3, tmp4, chromosome], key=attrgetter('fitness'))
+        idx = self.members.index(chromosome)
+        self.members[idx] = better
+
+    def generate_new_dna(self, seq_copy):
+        pidx = random.randint(1, total_people)
+        p_projects = [(pidx - 1) * project_num + i for i in range(1, project_num + 1)]
+        # 拿到索引和项目
+        p_idxs, p_seqs = self.get_proj_idx_seq(seq_copy, p_projects)
+        random.shuffle(p_seqs)
+        self.change_seq(seq_copy, p_idxs, p_seqs)
+        return Chromosome(seq_copy)
 
     @staticmethod
     def change_seq(child, change_idxs, new_seqs):
