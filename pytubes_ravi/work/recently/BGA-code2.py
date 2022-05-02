@@ -1,7 +1,5 @@
 """
-1. 随机产生初始解，建立初始种群，种群规模为Z；进行解码和适应度计算
-2. 使用交叉算子和突变算子对当前种群中对解进行重组，产生后代，形成新的种群。进行解码和适应度计算
-3. 迭代：重复1-2，直到解一定代数内最优值没有发生明显改进，输出当前最优解
+简化解码，不计算空闲时间段
 """
 import math
 import time
@@ -12,21 +10,21 @@ import copy
 import numpy as np
 
 cost_time_lookup = [
-    3,  # 0体质测试
-    3,  # 1内科
-    4,  # 2外科
-    2,  # 3眼耳口鼻科
-    3,  # 4验血
-    2,  # 5心电图
-    5,  # 6X光
-    6,  # 7B超
+    3,  # 0体质测试   4
+    3,  # 1内科      4
+    4,  # 2外科      3
+    2,  # 3眼耳口鼻科 5
+    3,  # 4验血      4
+    2,  # 5心电图    5
+    5,  # 6X光      3
+    6,  # 7B超      2
 ]  # 共28分钟
 
 # cost_time_lookup = [
 #     3, 3, 4, 6
 # ]
 
-total_people = 40
+total_people = 30
 project_num = len(cost_time_lookup)
 T_W = 15  # 等待阈值
 GAMMA = 5 # 惩罚系数
@@ -66,34 +64,17 @@ class Chromosome:
             people_last_end_time = self.get_people_last_end(people)  # 人有空的最早时间
             project_last_ends = self.get_project_last_end(project)
 
-            # 科室第一条记录
-            if type(project_last_ends) == int:
-                start_time = people_last_end_time
-                end_time = start_time + cost_time
-                people.append([project_index, start_time, end_time])
-                project.append([people_index, start_time, end_time])
+            start_time = max(people_last_end_time, project_last_ends)
+            end_time = start_time + cost_time
+            people.append([project_index, start_time, end_time])
+            project.append([people_index, start_time, end_time])
 
-            if type(project_last_ends) == list:
-
-                tmp_start = self.get_middle_start_time(project_last_ends, cost_time, people_last_end_time)
-                if tmp_start == -1:
-                    # 科室末尾插入
-                    start_time = max(people_last_end_time, project_last_ends[-1])
-                    end_time = start_time + cost_time
-                    people.append([project_index, start_time, end_time])
-                    project.append([people_index, start_time, end_time])
-                else:
-                    # 科室中间插入
-                    start_time = tmp_start
-                    end_time = start_time + cost_time
-                    people.append([project_index, start_time, end_time])
-                    project.append([people_index, start_time, end_time])
         return people_records, project_records
 
     def compute_fitness(self):
         global GAMMA
         global T_W
-        people_records, _ = self.translate()
+        people_records, project_records = self.translate()
         W_sum = 0
         w_thanT_sum = 0
         tmp_lates = []
@@ -118,7 +99,20 @@ class Chromosome:
         self.total_wait = W_sum
         self.greater_than_threshold = w_thanT_sum
         self.fitness = maxF + W_sum + GAMMA * w_thanT_sum
-
+        # print("****************")
+        # print("dna seq:", self.sequence)
+        # print("people's records: ")
+        # for p in people_records:
+        #     print(p)
+        # print("service records: ")
+        # for s in project_records:
+        #     s.sort(key=lambda e: e[2])
+        #     print(s)
+        # print("fitness:", self.fitness)
+        # print("makespan:", maxF)
+        # print("total_wait:", W_sum)
+        # print("greater_than_threshold:", w_thanT_sum)
+        # print("****************")
 
     @staticmethod
     def get_people_last_end(people_table):
@@ -135,7 +129,7 @@ class Chromosome:
             return 0
         else:
             project_table.sort(key=lambda e: e[2])
-            return [record[-1] for record in project_table]
+            return project_table[-1][2]
 
     @staticmethod
     def get_middle_start_time(end_time_list, cost_time, people_start):
@@ -214,10 +208,8 @@ class Population:
             p1_idxs, p1_seqs = self.get_proj_idx_seq(parent1.sequence, p_projects)
             # 拿到parent2上该顾客的所有项目及顺序
             p2_idxs, p2_seqs = self.get_proj_idx_seq(parent2.sequence, p_projects)
-
             # random.shuffle(p1_seqs)
             # random.shuffle(p2_seqs)
-
             self.change_seq(child1_seq, p1_idxs, p2_seqs)
             self.change_seq(child2_seq, p2_idxs, p1_seqs)
             return Chromosome(child1_seq), Chromosome(child2_seq)
@@ -234,7 +226,9 @@ class Population:
             chromosome.sequence[idx1], chromosome.sequence[idx2] = chromosome.sequence[idx2], chromosome.sequence[idx1]
 
 
-
+    def local_search(self):
+        """局部搜索"""
+        pass
 
     @staticmethod
     def change_seq(child, change_idxs, new_seqs):
@@ -262,8 +256,8 @@ class Population:
 if __name__ == '__main__':
     best_fitness = 99999999
     population = Population(POP_SIZE)
-
     best_fits = []
+    metrics = None
     for i in range(N_GENERATIONS):
         population.evolve_population()
         dna = population.get_best()
@@ -273,7 +267,10 @@ if __name__ == '__main__':
         print("makespan: {}, total_wait: {}, T_W_wait: {}".format(best.makespan, best.total_wait, best.greater_than_threshold))
         if best_fitness > best.fitness:
             best_fitness = best.fitness
+            metrics = [best.makespan, best.total_wait, best.greater_than_threshold]
         best_fits.append(best_fitness)
 
     plt.plot(best_fits)
     plt.show()
+    print(best_fitness)
+    print(metrics)
