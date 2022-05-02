@@ -14,11 +14,11 @@ import numpy as np
 cost_time_lookup = [
     3,  # 0体质测试   4
     3,  # 1内科      4
-    # 4,  # 2外科      3
-    # 2,  # 3眼耳口鼻科 5
-    # 3,  # 4验血      4
-    # 2,  # 5心电图    5
-    # 5,  # 6X光      3
+    4,  # 2外科      3
+    2,  # 3眼耳口鼻科 5
+    3,  # 4验血      4
+    2,  # 5心电图    5
+    5,  # 6X光      3
     6,  # 7B超      2
 ]  # 共28分钟
 
@@ -118,20 +118,20 @@ class Chromosome:
         self.total_wait = W_sum
         self.greater_than_threshold = w_thanT_sum
         self.fitness = maxF + W_sum + GAMMA * w_thanT_sum
-        print("****************")
-        print("dna seq:", self.sequence)
-        print("people's records: ")
-        for p in people_records:
-            print(p)
-        print("service records: ")
-        for s in project_records:
-            s.sort(key=lambda e: e[2])
-            print(s)
-        print("fitness:", self.fitness)
-        print("makespan:", maxF)
-        print("total_wait:", W_sum)
-        print("greater_than_threshold:", w_thanT_sum)
-        print("****************")
+        # print("****************")
+        # print("dna seq:", self.sequence)
+        # print("people's records: ")
+        # for p in people_records:
+        #     print(p)
+        # print("service records: ")
+        # for s in project_records:
+        #     s.sort(key=lambda e: e[2])
+        #     print(s)
+        # print("fitness:", self.fitness)
+        # print("makespan:", maxF)
+        # print("total_wait:", W_sum)
+        # print("greater_than_threshold:", w_thanT_sum)
+        # print("****************")
 
     @staticmethod
     def get_people_last_end(people_table):
