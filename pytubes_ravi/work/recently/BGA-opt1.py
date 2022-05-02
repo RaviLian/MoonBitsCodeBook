@@ -14,11 +14,11 @@ import numpy as np
 cost_time_lookup = [
     3,  # 0体质测试   4
     3,  # 1内科      4
-    4,  # 2外科      3
-    2,  # 3眼耳口鼻科 5
-    3,  # 4验血      4
-    2,  # 5心电图    5
-    5,  # 6X光      3
+    # 4,  # 2外科      3
+    # 2,  # 3眼耳口鼻科 5
+    # 3,  # 4验血      4
+    # 2,  # 5心电图    5
+    # 5,  # 6X光      3
     6,  # 7B超      2
 ]  # 共28分钟
 
@@ -26,15 +26,15 @@ cost_time_lookup = [
 #     3, 3, 4, 6
 # ]
 
-total_people = 30
+total_people = 9
 project_num = len(cost_time_lookup)
 T_W = 15  # 等待阈值
 GAMMA = 5 # 惩罚系数
-POP_SIZE = 100  # 种群大小
+POP_SIZE = 10  # 种群大小
 GROUP = 30  # 选择权重，百分之百
 CROSS_RATE = 0.8
 MUTATE_RATE = 1.0
-N_GENERATIONS = 500
+N_GENERATIONS = 5
 
 def translate_operation(opt):
     """解码操作"""
@@ -93,7 +93,7 @@ class Chromosome:
     def compute_fitness(self):
         global GAMMA
         global T_W
-        people_records, _ = self.translate()
+        people_records, project_records = self.translate()
         W_sum = 0
         w_thanT_sum = 0
         tmp_lates = []
@@ -118,7 +118,20 @@ class Chromosome:
         self.total_wait = W_sum
         self.greater_than_threshold = w_thanT_sum
         self.fitness = maxF + W_sum + GAMMA * w_thanT_sum
-
+        print("****************")
+        print("dna seq:", self.sequence)
+        print("people's records: ")
+        for p in people_records:
+            print(p)
+        print("service records: ")
+        for s in project_records:
+            s.sort(key=lambda e: e[2])
+            print(s)
+        print("fitness:", self.fitness)
+        print("makespan:", maxF)
+        print("total_wait:", W_sum)
+        print("greater_than_threshold:", w_thanT_sum)
+        print("****************")
 
     @staticmethod
     def get_people_last_end(people_table):
@@ -157,36 +170,44 @@ class Population:
         self.members = []
         self.__seed_population()
 
+    # def __seed_population(self):
+    #     global total_people
+    #     global project_num
+    #     sequence_size = total_people * project_num
+    #     sample_seq = [i for i in range(1, sequence_size + 1)]
+    #     init_seq = self.get_init_seq()
+    #
+    #     init_len = len(init_seq)
+    #     for i in init_seq:
+    #         sample_seq.remove(i)
+    #     random.shuffle(init_seq)
+    #     for i in range(self.size):
+    #         sequence = copy.deepcopy(init_seq)
+    #         rest = random.sample(sample_seq, sequence_size - init_len)
+    #         sequence.extend(rest)
+    #         self.members.append(Chromosome(sequence))
+
     def __seed_population(self):
         global total_people
         global project_num
         sequence_size = total_people * project_num
-        sample_seq = [i for i in range(1, sequence_size + 1)]
-        init_seq = self.get_init_seq()
-
-        init_len = len(init_seq)
-        for i in init_seq:
-            sample_seq.remove(i)
-        random.shuffle(init_seq)
         for i in range(self.size):
-            sequence = copy.deepcopy(init_seq)
-            rest = random.sample(sample_seq, sequence_size - init_len)
-            sequence.extend(rest)
+            sequence = random.sample(range(1, sequence_size + 1), sequence_size)
             self.members.append(Chromosome(sequence))
 
-    def get_init_seq(self):
-        actions = [[j + i * project_num for i in range(total_people)] for j in range(1, project_num + 1)]
-        res = []
-        res.extend(actions[0][:4])
-        res.extend(actions[1][4:8])
-        res.extend(actions[2][8:11])
-        res.extend(actions[3][11:16])
-        res.extend(actions[4][16:20])
-        res.extend(actions[5][20:25])
-        res.extend(actions[6][25:28])
-        res.extend(actions[7][28:])
-        assert len(res) == 30
-        return res
+    # def get_init_seq(self):
+    #     actions = [[j + i * project_num for i in range(total_people)] for j in range(1, project_num + 1)]
+    #     res = []
+    #     res.extend(actions[0][:4])
+    #     res.extend(actions[1][4:8])
+    #     res.extend(actions[2][8:11])
+    #     res.extend(actions[3][11:16])
+    #     res.extend(actions[4][16:20])
+    #     res.extend(actions[5][20:25])
+    #     res.extend(actions[6][25:28])
+    #     res.extend(actions[7][28:])
+    #     assert len(res) == 30
+    #     return res
 
     def evolve_population(self):
         """种群迭代"""
@@ -287,7 +308,6 @@ class Population:
 if __name__ == '__main__':
     best_fitness = 99999999
     population = Population(POP_SIZE)
-    population.get_init_seq()
     best_fits = []
     metrics = None
     for i in range(N_GENERATIONS):
