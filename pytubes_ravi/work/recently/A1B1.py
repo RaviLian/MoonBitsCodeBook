@@ -3,6 +3,7 @@
 启发式解，每一轮分配，顾客按照剩余服务时间排队，剩余服务时间最长的优先分配;
 每一轮分配，优先分配服务时长最长的
 """
+import random
 from operator import attrgetter
 
 cost_time_lookup = [
@@ -42,6 +43,7 @@ class Patient:
     def __repr__(self):
         return "p-" + str(self.pid)
 
+
 class HeuristicSolution:
     """启发式解"""
 
@@ -54,37 +56,73 @@ class HeuristicSolution:
 
     def build_table(self):
         """建表"""
-        self.first_build_30()
-        # 根据剩余服务时间排序
-        this_seq = sorted([pat for pat in self.patients], key=attrgetter('rest_time'), reverse=True)
-        for patient in this_seq:
-            pass
+        for i in range(project_num):
+            """分配8轮，每次每人一个项目"""
+            if i == 0:  # 第一轮随机分配
+                for pid in range(total_people):
+                    """每人一个项目"""
+                    patient = self.patients[pid]
+                    sid = random.randint(0, len(patient.actions) - 1)
+                    action = patient.actions[sid]
+                    patient.remove_actions(action)
+                    # 插入表格
+                    self.create_records(pid, action)
+                    # 记录调度
+                    self.operations.append([pid, action[0], action[1]])
+            else:
+                # 剩余服务时间长的人优先分配
+                # 每次分配：先找自己剩余的project，再检查每个project的记录数，最后选择最短的队伍进入
+                patients = sorted(self.patients, key=attrgetter('rest_time'), reverse=True)
+                for p in patients:
+                    sid, _ = self.get_min_queue(p)
+                    action = common_actions[sid]
+                    p.remove_actions(action)
+                    # 插入表格
+                    self.create_records(p.pid, action)
+                    # 记录调度
+                    self.operations.append([p.pid, action[0], action[1]])
+
+    def get_min_queue(self, patient):
+        queue = []
+        for action in patient.actions:
+            sid = action[0]
+            queue.append([sid, len(self.project_table[sid])])
+        queue.sort(key=lambda a: a[1])
+        return queue[0]
 
     def first_build_30(self):
         for i in range(4):
             self.patients[i].remove_actions(common_actions[0])
             self.create_records(i, common_actions[0])
+            self.operations.append([i, common_actions[0][0], common_actions[0][1]])
         for i in range(4, 8):
             self.patients[i].remove_actions(common_actions[1])
             self.create_records(i, common_actions[1])
+            self.operations.append([i, common_actions[1][0], common_actions[1][1]])
         for i in range(8, 11):
             self.patients[i].remove_actions(common_actions[2])
             self.create_records(i, common_actions[2])
+            self.operations.append([i, common_actions[2][0], common_actions[2][1]])
         for i in range(11, 16):
             self.patients[i].remove_actions(common_actions[3])
             self.create_records(i, common_actions[3])
+            self.operations.append([i, common_actions[3][0], common_actions[3][1]])
         for i in range(16, 20):
             self.patients[i].remove_actions(common_actions[4])
             self.create_records(i, common_actions[4])
+            self.operations.append([i, common_actions[4][0], common_actions[4][1]])
         for i in range(20, 25):
             self.patients[i].remove_actions(common_actions[5])
             self.create_records(i, common_actions[5])
+            self.operations.append([i, common_actions[5][0], common_actions[5][1]])
         for i in range(25, 28):
             self.patients[i].remove_actions(common_actions[6])
             self.create_records(i, common_actions[6])
+            self.operations.append([i, common_actions[6][0], common_actions[6][1]])
         for i in range(28, 30):
             self.patients[i].remove_actions(common_actions[7])
             self.create_records(i, common_actions[7])
+            self.operations.append([i, common_actions[7][0], common_actions[7][1]])
 
     def create_records(self, pid, action):
         sid, cost_time = action[0], action[1]
@@ -112,7 +150,7 @@ class HeuristicSolution:
     def compute_fitness(self):
         global GAMMA
         global T_W
-        people_records, project_records = self.translate()
+        people_records, project_records = self.patient_table, self.project_table
         W_sum = 0
         w_thanT_sum = 0
         tmp_lates = []
@@ -146,9 +184,26 @@ class HeuristicSolution:
         for p in self.project_table:
             print(p)
 
+    def print_operations(self):
+        print("operations")
+        print(self.operations)
 
-if __name__ == '__main__':
+    def translate2seq(self):
+        seq = []
+        for opt in self.operations:
+            pid, sid, _ = opt
+            gene = pid * project_num + sid + 1
+            seq.append(gene)
+        return seq
+
+
+def generate_dna():
     heur = HeuristicSolution()
     heur.build_table()
-    heur.print_patient_table()
-    heur.print_project_table()
+    print(heur.compute_fitness())
+    return heur.translate2seq()
+
+
+if __name__ == '__main__':
+    d = generate_dna()
+    print(d)

@@ -10,6 +10,7 @@ import random
 from operator import attrgetter
 import copy
 import numpy as np
+from A1B1 import generate_dna
 
 cost_time_lookup = [
     3,  # 0体质测试   4
@@ -192,7 +193,9 @@ class Population:
         global project_num
         sequence_size = total_people * project_num
         for i in range(self.size):
-            sequence = random.sample(range(1, sequence_size + 1), sequence_size)
+            # sequence = random.sample(range(1, sequence_size + 1), sequence_size)
+            # self.members.append(Chromosome(sequence))
+            sequence = generate_dna()
             self.members.append(Chromosome(sequence))
         # 局部搜索
         for mem in self.members:
@@ -286,10 +289,11 @@ class Population:
 
     def local_search(self, chromosome):
         """局部搜索"""
-        tmp1 = self.generate_new_dna(copy.deepcopy(chromosome.sequence))
-        tmp2 = self.generate_new_dna(copy.deepcopy(chromosome.sequence))
-        tmp3 = self.generate_new_dna(copy.deepcopy(chromosome.sequence))
-        tmp4 = self.generate_new_dna(copy.deepcopy(chromosome.sequence))
+        pidxs = self.get_large_waits_pidx(chromosome)
+        tmp1 = self.generate_new_dna(copy.deepcopy(chromosome.sequence), random.choice(pidxs))
+        tmp2 = self.generate_new_dna(copy.deepcopy(chromosome.sequence), random.choice(pidxs))
+        tmp3 = self.generate_new_dna(copy.deepcopy(chromosome.sequence), random.choice(pidxs))
+        tmp4 = self.generate_new_dna(copy.deepcopy(chromosome.sequence), random.choice(pidxs))
         tmp1.compute_fitness()
         tmp2.compute_fitness()
         tmp3.compute_fitness()
@@ -299,14 +303,38 @@ class Population:
         idx = self.members.index(chromosome)
         self.members[idx] = better
 
-    def generate_new_dna(self, seq_copy):
-        pidx = random.randint(1, total_people)
+    def generate_new_dna(self, seq_copy, pidx):
+        # pidx = random.randint(1, total_people)
         p_projects = [(pidx - 1) * project_num + i for i in range(1, project_num + 1)]
         # 拿到索引和项目
         p_idxs, p_seqs = self.get_proj_idx_seq(seq_copy, p_projects)
         random.shuffle(p_seqs)
         self.change_seq(seq_copy, p_idxs, p_seqs)
         return Chromosome(seq_copy)
+
+    @staticmethod
+    def get_large_waits_pidx(chromosome):
+        """从染色体中得到较大等待顾客的pid"""
+        people_records, project_records = chromosome.translate()
+        pidxs = []
+        for pid in range(len(people_records)):
+            records = people_records[pid]
+            records.sort(key=lambda e:e[2])
+            for i in range(len(records)):
+                if i == 0:
+                    wait_time = records[i][1] - 0
+                    if wait_time == 0:
+                        continue
+                    if wait_time >= 20:
+                        pidxs.append(pid)
+                        break
+                else:
+                    wait_time = records[i][1] - records[i - 1][2]
+                    if wait_time - T_W >= 20:
+                        pidxs.append(pid)
+                        break
+        return pidxs
+
 
     @staticmethod
     def change_seq(child, change_idxs, new_seqs):
