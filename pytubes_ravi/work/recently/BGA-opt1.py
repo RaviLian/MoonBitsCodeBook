@@ -5,7 +5,7 @@
 """
 import math
 import time
-# import matplotlib.pyplot as plt
+import matplotlib.pyplot as plt
 import random
 from operator import attrgetter
 import copy
@@ -27,7 +27,7 @@ cost_time_lookup = [
 #     3, 3, 4, 6
 # ]
 
-total_people = 30
+total_people = 40
 project_num = len(cost_time_lookup)
 T_W = 15  # 等待阈值
 GAMMA = 5 # 惩罚系数
@@ -193,10 +193,10 @@ class Population:
         global project_num
         sequence_size = total_people * project_num
         for i in range(self.size):
-            # sequence = random.sample(range(1, sequence_size + 1), sequence_size)
-            # self.members.append(Chromosome(sequence))
-            sequence = generate_dna()
+            sequence = random.sample(range(1, sequence_size + 1), sequence_size)
             self.members.append(Chromosome(sequence))
+            # sequence = generate_dna()
+            # self.members.append(Chromosome(sequence))
         # 局部搜索
         for mem in self.members:
             self.local_search(mem)
@@ -268,8 +268,8 @@ class Population:
             # 拿到parent2上该顾客的所有项目及顺序
             p2_idxs, p2_seqs = self.get_proj_idx_seq(parent2.sequence, p_projects)
 
-            random.shuffle(p1_seqs)
-            random.shuffle(p2_seqs)
+            # random.shuffle(p1_seqs)
+            # random.shuffle(p2_seqs)
 
             self.change_seq(child1_seq, p1_idxs, p2_seqs)
             self.change_seq(child2_seq, p2_idxs, p1_seqs)
@@ -375,7 +375,7 @@ if __name__ == '__main__':
             metrics = [best.makespan, best.total_wait, best.greater_than_threshold]
         best_fits.append(best_fitness)
 
-    # plt.plot(best_fits)
-    # plt.show()
+    plt.plot(best_fits)
+    plt.show()
     print(best_fitness)
     print(metrics)

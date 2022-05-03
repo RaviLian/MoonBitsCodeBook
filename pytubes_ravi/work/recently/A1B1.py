@@ -21,7 +21,7 @@ cost_time_lookup = [
 #     3, 3, 4, 6
 # ]
 
-total_people = 30
+total_people = 40
 project_num = len(cost_time_lookup)
 common_actions = [(i, cost_time_lookup[i]) for i in range(project_num)]
 T_W = 15  # 等待阈值
@@ -72,6 +72,7 @@ class HeuristicSolution:
             else:
                 # 剩余服务时间长的人优先分配
                 # 每次分配：先找自己剩余的project，再检查每个project的记录数，最后选择最短的队伍进入
+                # TODO:过滤一下自己有空时繁忙的科室
                 patients = sorted(self.patients, key=attrgetter('rest_time'), reverse=True)
                 for p in patients:
                     sid, _ = self.get_min_queue(p)
