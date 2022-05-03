@@ -5,7 +5,7 @@
 """
 import math
 import time
-import matplotlib.pyplot as plt
+# import matplotlib.pyplot as plt
 import random
 from operator import attrgetter
 import copy
@@ -241,7 +241,7 @@ class Population:
 
     def get_best(self):
         self._get_fitness()
-        return sorted(self.members, key=attrgetter('fitness'))[:1]
+        return min(self.members, key=attrgetter('fitness'))
 
 
     def select(self):
@@ -366,8 +366,7 @@ if __name__ == '__main__':
     metrics = None
     for i in range(N_GENERATIONS):
         population.evolve_population()
-        dna = population.get_best()
-        best = dna[0]
+        best = population.get_best()
         print("Gen: {}, best dna seq: {}".format(i, best.sequence))
         print("best fitness: {}".format(best.fitness))
         print("makespan: {}, total_wait: {}, T_W_wait: {}".format(best.makespan, best.total_wait, best.greater_than_threshold))
@@ -376,7 +375,7 @@ if __name__ == '__main__':
             metrics = [best.makespan, best.total_wait, best.greater_than_threshold]
         best_fits.append(best_fitness)
 
-    plt.plot(best_fits)
-    plt.show()
+    # plt.plot(best_fits)
+    # plt.show()
     print(best_fitness)
     print(metrics)

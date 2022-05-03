@@ -18,3 +18,4 @@ GROUP = 30  # 选择权重，百分之百
 CROSS_RATE = 0.8
 MUTATE_RATE = 1.0
 N_GENERATIONS = 500
+
